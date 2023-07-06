@@ -3,8 +3,10 @@
 
 #include "framework.h"
 #include "SnakeProject.h"
+#include "Snake.h"
 
 #define MAX_LOADSTRING 100
+#define timer_ID_1 11
 
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
@@ -55,6 +57,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
+void DrawCircle(HDC hdc, POINT center, int radius);
+BOOL Update();
 
 
 //
@@ -75,7 +79,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hInstance      = hInstance;
     wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SNAKEPROJECT));
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+    wcex.hbrBackground  = (HBRUSH)CreateSolidBrush(RGB(255, 255, 255));
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_SNAKEPROJECT);
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
@@ -98,7 +102,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+      300, 100, 700, 700, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -123,8 +127,42 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    PAINTSTRUCT ps;
+    HDC hdc;
+
+    static POINT center;
+    static POINT ptMousePos;
+    static BOOL isClicked;
+    static RECT rectView;
+
+    static Snake s[100];
+
     switch (message)
     {
+    case WM_CREATE:
+        center = { 0,0 };
+        isClicked = FALSE;
+        GetClientRect(hWnd, &rectView); // 윈도우창 크기값을 rectView에 저장함
+        break;
+    case WM_TIMER: // 타이머 이벤트, 타이머는 일이 바쁘지 않을때만 잘 작동됨
+    {
+        //for (int i = 0; i < 1; i++)
+        //{
+            s[0].Update(rectView);
+        //}
+        InvalidateRect(hWnd, NULL, TRUE);
+    }
+    case WM_KEYDOWN: // 눌리면 발생
+    {
+        isClicked = Update();
+        InvalidateRect(hWnd, NULL, TRUE);
+    }
+    break;
+    case WM_KEYUP: // 눌렀다 떼면 발생
+    {
+        isClicked = FALSE;
+        InvalidateRect(hWnd, NULL, TRUE);
+    }
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
@@ -144,9 +182,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_PAINT:
         {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
+            hdc = BeginPaint(hWnd, &ps);
+
+            if (Update() == TRUE)
+                s[0].Draw(hdc);
+
+
             EndPaint(hWnd, &ps);
         }
         break;
@@ -177,4 +218,43 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
+}
+
+void DrawCircle(HDC hdc, POINT center, int radius)
+{
+    Ellipse(hdc, center.x - radius, center.y - radius, center.x + radius, center.y + radius);
+}
+
+BOOL Update(Snake s)
+{
+    // : wm_keydown, wm_keyup을 사용하면 반응이 즉각적이지 않음
+    // : GetKeyState는 "키가 눌렸는가?"와 "키의 토글상태가 무엇인가?"를 알아낼 때 사용한다. 지속적인 상태를 확인할때 사용
+    // : GetAsyncKeyState는 "키가 눌렸는가?"와 "언제부터 눌렸는가?"를 알아낼 때 사용한다. 순간적인 상태를 확인할때 사용
+
+    BOOL isClicked = FALSE;
+
+    if (GetAsyncKeyState('A') & 0x8000)
+    {
+        isClicked = TRUE;
+        s[0].SetDirection(-10, 0); // 좌로
+    }
+    else if (GetAsyncKeyState('D') & 0x8000)
+    {
+        isClicked = TRUE;
+        s[0].SetDirection(10, 0); // 우로
+    }
+    else if (GetAsyncKeyState('W') & 0x8000)
+    {
+        isClicked = TRUE;
+        s[0].SetDirection(0, -10); // 위로
+    }
+    else if (GetAsyncKeyState('S') & 0x8000)
+    {
+        isClicked = TRUE;
+        s[0].SetDirection(0, 10); // 아래로
+    }
+    else
+        isClicked = FALSE;
+
+    return isClicked;
 }
