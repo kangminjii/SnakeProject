@@ -4,9 +4,23 @@
 #include "framework.h"
 #include "SnakeProject.h"
 #include "Snake.h"
+#include <list>
+#include <time.h>
 
 #define MAX_LOADSTRING 100
 #define timer_ID_1 11
+
+double LengthPts(POINT pt1, POINT pt2)
+{
+    return (sqrt((float)(pt2.x - pt1.x) * (pt2.x - pt1.x) + (pt2.y - pt1.y) * (pt2.y - pt1.y)));
+}
+
+BOOL InCircle(POINT pt1, POINT pt2)
+{
+    if (LengthPts(pt1, pt2) < 10)  return TRUE;
+
+    return FALSE;
+}
 
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
@@ -57,8 +71,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
-void DrawCircle(HDC hdc, POINT center, int radius);
-BOOL Update();
+//WinAPI 사용하면서 콘솔창 동시에 띄우기
+
+//#ifdef UNICODE
+//
+//#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
+//
+//#else
+//
+//#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
+//
+//#endif
 
 
 //
@@ -132,36 +155,82 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     static POINT center;
     static POINT ptMousePos;
-    static BOOL isClicked;
+
     static RECT rectView;
 
     static Snake s[100];
+    static Snake items[100];
+
+    static int count;
+    static int snakeCount;
+    static int random;
+   
+    static BOOL isClicked = FALSE;
+    static BOOL isCollided = FALSE;
+    
+    //static std::list<Snake> s[100];
 
     switch (message)
     {
     case WM_CREATE:
         center = { 0,0 };
-        isClicked = FALSE;
         GetClientRect(hWnd, &rectView); // 윈도우창 크기값을 rectView에 저장함
+        
+        SetTimer(hWnd, 1, 100, NULL);
+
+        count = 0;
+        snakeCount = 0;
+        random = 0;
+
+        //Snake* temp = &s[0];
+       
         break;
     case WM_TIMER: // 타이머 이벤트, 타이머는 일이 바쁘지 않을때만 잘 작동됨
     {
-        //for (int i = 0; i < 1; i++)
-        //{
-            s[0].Update(rectView);
-        //}
+        s[0].Update(rectView);
+        for (int i = 0; i <= count; i++)
+        {
+            // 링크드 리스트처럼 연결
+            s[i + 1].SetNext(&s[i]);
+        }
+        for (int i = 0; i <= count; i++)
+        {
+            s[i + 1].SetPosition(s[i].GetX() - s[0].getDirectionX() * 4, s[i].GetY() - s[0].getDirectionY() * 4);
+        }
         InvalidateRect(hWnd, NULL, TRUE);
     }
+        break;
     case WM_KEYDOWN: // 눌리면 발생
     {
-        isClicked = Update();
+        // : wm_keydown, wm_keyup을 사용하면 반응이 즉각적이지 않음 > VK_DOWN?
+        // : GetKeyState는 "키가 눌렸는가?"와 "키의 토글상태가 무엇인가?"를 알아낼 때 사용한다. 지속적인 상태를 확인할때 사용
+        // : GetAsyncKeyState는 "키가 눌렸는가?"와 "언제부터 눌렸는가?"를 알아낼 때 사용한다. 순간적인 상태를 확인할때 사용
+        
+        count++;
+        isClicked = TRUE;
+
+        if (GetAsyncKeyState('A') & 0x8000)
+        {
+            s[0].SetDirection(-5, 0); // 좌로
+        }
+        else if (GetAsyncKeyState('D') & 0x8000)
+        {
+            s[0].SetDirection(5, 0); // 우로
+        }
+        else if (GetAsyncKeyState('W') & 0x8000)
+        {
+            s[0].SetDirection(0, -5); // 위로
+        }
+        else if (GetAsyncKeyState('S') & 0x8000)
+        {
+            s[0].SetDirection(0, 5); // 아래로
+        }
+
         InvalidateRect(hWnd, NULL, TRUE);
     }
     break;
     case WM_KEYUP: // 눌렀다 떼면 발생
     {
-        isClicked = FALSE;
-        InvalidateRect(hWnd, NULL, TRUE);
     }
     case WM_COMMAND:
         {
@@ -184,14 +253,41 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             hdc = BeginPaint(hWnd, &ps);
 
-            if (Update() == TRUE)
-                s[0].Draw(hdc);
+            if (isClicked == TRUE)
+            {
+                for (int i = 0; i < count; i++)
+                    s[i].Draw(hdc);
+            }
 
 
+
+
+            
+           // // 랜덤아이템
+           // srand(time(NULL));
+           // random = 100 + 20 * (rand() % 10 + 1);
+
+           // HBRUSH hBrush, oldBrush;
+           // hBrush = (HBRUSH)GetStockObject(RGB(0,0,255)); 
+           // oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+          
+           // if(count == 0)
+           //     Ellipse(hdc, random - 10, random - 10, random + 10, random + 10);
+
+           //// 아이템을 먹었다
+           // if (InCircle({random, random}, {s[0].GetX(), s[0].GetY()}))
+           // {
+           //     count++;
+           //     Ellipse(hdc, random - 10, random - 10, random + 10, random + 10);
+           // }
+           //    
+           // SelectObject(hdc, oldBrush);
+           // DeleteObject(hBrush);
             EndPaint(hWnd, &ps);
         }
         break;
     case WM_DESTROY:
+        KillTimer(hWnd, 1);
         PostQuitMessage(0);
         break;
     default:
@@ -220,41 +316,3 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     return (INT_PTR)FALSE;
 }
 
-void DrawCircle(HDC hdc, POINT center, int radius)
-{
-    Ellipse(hdc, center.x - radius, center.y - radius, center.x + radius, center.y + radius);
-}
-
-BOOL Update(Snake s)
-{
-    // : wm_keydown, wm_keyup을 사용하면 반응이 즉각적이지 않음
-    // : GetKeyState는 "키가 눌렸는가?"와 "키의 토글상태가 무엇인가?"를 알아낼 때 사용한다. 지속적인 상태를 확인할때 사용
-    // : GetAsyncKeyState는 "키가 눌렸는가?"와 "언제부터 눌렸는가?"를 알아낼 때 사용한다. 순간적인 상태를 확인할때 사용
-
-    BOOL isClicked = FALSE;
-
-    if (GetAsyncKeyState('A') & 0x8000)
-    {
-        isClicked = TRUE;
-        s[0].SetDirection(-10, 0); // 좌로
-    }
-    else if (GetAsyncKeyState('D') & 0x8000)
-    {
-        isClicked = TRUE;
-        s[0].SetDirection(10, 0); // 우로
-    }
-    else if (GetAsyncKeyState('W') & 0x8000)
-    {
-        isClicked = TRUE;
-        s[0].SetDirection(0, -10); // 위로
-    }
-    else if (GetAsyncKeyState('S') & 0x8000)
-    {
-        isClicked = TRUE;
-        s[0].SetDirection(0, 10); // 아래로
-    }
-    else
-        isClicked = FALSE;
-
-    return isClicked;
-}
