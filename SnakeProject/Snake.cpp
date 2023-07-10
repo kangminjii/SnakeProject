@@ -3,24 +3,18 @@
 
 const int radius = 10;
 
-Snake::Snake(POINT C, POINT dir, Snake* next)
+Snake::Snake(POINT C, POINT dir)
 {
 	center = { C.x, C.y };
 	direction = { dir.x, dir.y };
-	this->next = next;
 }
 
 Snake::Snake()
 {
 	center = { 50, 100 };
-	direction = { 5, 0 };
-	this->next = NULL;
+	direction = { 0, 0 };
 }
 
-void Snake::SetNext(Snake* next)
-{
-	this->next = next;
-}
 
 void Snake::SetPosition(int x, int y)
 {
@@ -34,12 +28,12 @@ void Snake::SetDirection(int x, int y)
 	direction.y = y;
 }
 
-int Snake::GetX()
+int Snake::GetX() const
 {
 	return center.x;
 }
 
-int Snake::GetY()
+int Snake::GetY() const
 {
 	return center.y;
 }
@@ -54,14 +48,9 @@ int Snake::getDirectionY()
 	return direction.y;
 }
 
-Snake* Snake::getNext()
-{
-	return next;
-}
-
 void Snake::Update(RECT& r)
 {
-	/////////////////// 죽음 처리하기
+	/// 죽음 처리하기
 	if (center.x + radius >= r.right || center.x - radius <= r.left)
 	{
 		direction.x = 0;
@@ -81,21 +70,3 @@ void Snake::Draw(HDC hdc)
 {
 	Ellipse(hdc, center.x - radius, center.y - radius, center.x + radius, center.y + radius);
 }
-
-//POINT Snake::Item(HDC hdc)
-//{
-//
-//	//POINT itemCenter = { center.x + random , center.y + random };
-//
-//	//return itemCenter;
-//}
-//
-//BOOL Snake::collision(HDC hdc)
-//{
-//	if (abs(Item(hdc).x - center.x) <= 2 * radius)
-//		return TRUE;
-//	else if (abs(Item(hdc).y - center.y) <= 2 * radius)
-//		return TRUE;
-//	else
-//		return FALSE;
-//}

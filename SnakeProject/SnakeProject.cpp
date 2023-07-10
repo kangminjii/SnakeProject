@@ -4,11 +4,19 @@
 #include "framework.h"
 #include "SnakeProject.h"
 #include "Snake.h"
-#include <list>
 #include <time.h>
-
+#include <iostream>
+#include <string>
+using namespace std;
 #define MAX_LOADSTRING 100
-#define timer_ID_1 11
+
+//WinAPI 사용하면서 콘솔창 동시에 띄우기
+ 
+#ifdef UNICODE
+#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
+#else
+#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
+#endif
 
 double LengthPts(POINT pt1, POINT pt2)
 {
@@ -17,7 +25,7 @@ double LengthPts(POINT pt1, POINT pt2)
 
 BOOL InCircle(POINT pt1, POINT pt2)
 {
-    if (LengthPts(pt1, pt2) < 10)  return TRUE;
+    if (LengthPts(pt1, pt2) <= 10)  return TRUE;
 
     return FALSE;
 }
@@ -34,9 +42,9 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
@@ -49,7 +57,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     MyRegisterClass(hInstance);
 
     // 애플리케이션 초기화를 수행합니다:
-    if (!InitInstance (hInstance, nCmdShow))
+    if (!InitInstance(hInstance, nCmdShow))
     {
         return FALSE;
     }
@@ -68,7 +76,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
     }
 
-    return (int) msg.wParam;
+    return (int)msg.wParam;
 }
 
 //WinAPI 사용하면서 콘솔창 동시에 띄우기
@@ -95,17 +103,17 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SNAKEPROJECT));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)CreateSolidBrush(RGB(255, 255, 255));
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_SNAKEPROJECT);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SNAKEPROJECT));
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)CreateSolidBrush(RGB(255, 255, 255));
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_SNAKEPROJECT);
+    wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
     return RegisterClassExW(&wcex);
 }
@@ -122,20 +130,20 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
+    hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      300, 100, 700, 700, nullptr, nullptr, hInstance, nullptr);
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+        300, 100, 500, 500, nullptr, nullptr, hInstance, nullptr);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+    if (!hWnd)
+    {
+        return FALSE;
+    }
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
 
-   return TRUE;
+    return TRUE;
 }
 
 //
@@ -152,78 +160,135 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     PAINTSTRUCT ps;
     HDC hdc;
-
-    static POINT center;
-    static POINT ptMousePos;
+    HBRUSH hBrush, headBrush, oldBrush;
 
     static RECT rectView;
 
+    // snake
     static Snake s[100];
-    static Snake items[100];
 
+    // 아이템
     static int count;
-    static int snakeCount;
     static int random;
-   
+    static POINT items[100];
+
+    // 키 이벤트
+    enum { Left, Right, Up, Down, None };
+    static int state = None;
     static BOOL isClicked = FALSE;
-    static BOOL isCollided = FALSE;
+
+    // 점수 UI
+    static TCHAR str[20];
+    static SIZE size;
+    string score = std::to_string(count * 100);
     
-    //static std::list<Snake> s[100];
 
     switch (message)
     {
     case WM_CREATE:
-        center = { 0,0 };
         GetClientRect(hWnd, &rectView); // 윈도우창 크기값을 rectView에 저장함
-        
-        SetTimer(hWnd, 1, 100, NULL);
+
+        SetTimer(hWnd, 1, 80, NULL); // 속도 조절
 
         count = 0;
-        snakeCount = 0;
-        random = 0;
 
-        //Snake* temp = &s[0];
-       
+        srand(time(NULL));
+        random = 50 * (rand() % 6 + 1); // 50, 100, 150, 200, 250, 300
+        items[0] = { random, random };
+
         break;
     case WM_TIMER: // 타이머 이벤트, 타이머는 일이 바쁘지 않을때만 잘 작동됨
     {
+        int tempX[100], tempY[100];
+
+        // 이전 위치 저장
+        for (int i = 0; i < count; i++)
+        {
+            tempX[i] = s[i].GetX();
+            tempY[i] = s[i].GetY();
+        }
+        // 머리 업데이트
         s[0].Update(rectView);
-        for (int i = 0; i <= count; i++)
+
+        // 새롭게 생긴 몸통의 위치와 속도를 지정
+        for (int i = 0; i < count; i++)
         {
-            // 링크드 리스트처럼 연결
-            s[i + 1].SetNext(&s[i]);
+            s[i + 1].SetPosition(tempX[i], tempY[i]);
+            s[i + 1].SetDirection(s[i].getDirectionX(), s[i].getDirectionY());
         }
-        for (int i = 0; i <= count; i++)
+
+        // 경계선에 닿았을 때, 초기화
+        if (s[0].getDirectionX() == 0 && s[0].getDirectionY() == 0)
         {
-            s[i + 1].SetPosition(s[i].GetX() - s[0].getDirectionX() * 4, s[i].GetY() - s[0].getDirectionY() * 4);
+            // UI 초기화
+            for (int i = 0; i < count; i++)
+            {
+                str[i] = 0;
+            }
+            count = 0;
+            s[0].SetPosition(50, 100);
         }
+
+        // 몸통에 닿았을 때, 초기화
+        for (int i = 1; i <= count; i++)
+        {
+            if (InCircle({ s[0].GetX(), s[0].GetY() }, { s[i].GetX(), s[i].GetY() }))
+            {
+                // UI 초기화
+                for (int i = 0; i < count; i++)
+                {
+                    str[i] = 0;
+                }
+
+                count = 0;
+                s[0].SetPosition(50, 100);
+                s[0].SetDirection(0, 0);
+                break;
+            }
+        }
+       
         InvalidateRect(hWnd, NULL, TRUE);
     }
-        break;
+    break;
     case WM_KEYDOWN: // 눌리면 발생
     {
         // : wm_keydown, wm_keyup을 사용하면 반응이 즉각적이지 않음 > VK_DOWN?
         // : GetKeyState는 "키가 눌렸는가?"와 "키의 토글상태가 무엇인가?"를 알아낼 때 사용한다. 지속적인 상태를 확인할때 사용
         // : GetAsyncKeyState는 "키가 눌렸는가?"와 "언제부터 눌렸는가?"를 알아낼 때 사용한다. 순간적인 상태를 확인할때 사용
-        
-        count++;
+
         isClicked = TRUE;
 
         if (GetAsyncKeyState('A') & 0x8000)
         {
-            s[0].SetDirection(-5, 0); // 좌로
+            if (state != Right)
+            {
+                s[0].SetDirection(-20, 0); // 좌로
+                state = Left;
+            }
         }
-        else if (GetAsyncKeyState('D') & 0x8000)
+        if (GetAsyncKeyState('D') & 0x8000)
         {
-            s[0].SetDirection(5, 0); // 우로
+            if (state != Left)
+            {
+                s[0].SetDirection(20, 0); // 우로
+                state = Right;
+            }
         }
-        else if (GetAsyncKeyState('W') & 0x8000)
+        if (GetAsyncKeyState('W') & 0x8000)
         {
-            s[0].SetDirection(0, -5); // 위로
+            if (state != Down)
+            {
+                s[0].SetDirection(0, -20); // 위로
+                state = Up;
+            }
         }
-        else if (GetAsyncKeyState('S') & 0x8000)
+        if (GetAsyncKeyState('S') & 0x8000)
         {
-            s[0].SetDirection(0, 5); // 아래로
+            if (state != Up)
+            {
+                s[0].SetDirection(0, 20); // 아래로
+                state = Down;
+            }
         }
 
         InvalidateRect(hWnd, NULL, TRUE);
@@ -233,59 +298,80 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     }
     case WM_COMMAND:
+    {
+        int wmId = LOWORD(wParam);
+        // 메뉴 선택을 구문 분석합니다:
+        switch (wmId)
         {
-            int wmId = LOWORD(wParam);
-            // 메뉴 선택을 구문 분석합니다:
-            switch (wmId)
-            {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
+        case IDM_ABOUT:
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            break;
+        case IDM_EXIT:
+            DestroyWindow(hWnd);
+            break;
+        default:
+            return DefWindowProc(hWnd, message, wParam, lParam);
         }
-        break;
+    }
+    break;
     case WM_PAINT:
+    {
+        hdc = BeginPaint(hWnd, &ps);
+
+        for (int i = 0; i < score.size(); i++)
         {
-            hdc = BeginPaint(hWnd, &ps);
-
-            if (isClicked == TRUE)
-            {
-                for (int i = 0; i < count; i++)
-                    s[i].Draw(hdc);
-            }
-
-
-
-
-            
-           // // 랜덤아이템
-           // srand(time(NULL));
-           // random = 100 + 20 * (rand() % 10 + 1);
-
-           // HBRUSH hBrush, oldBrush;
-           // hBrush = (HBRUSH)GetStockObject(RGB(0,0,255)); 
-           // oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
-          
-           // if(count == 0)
-           //     Ellipse(hdc, random - 10, random - 10, random + 10, random + 10);
-
-           //// 아이템을 먹었다
-           // if (InCircle({random, random}, {s[0].GetX(), s[0].GetY()}))
-           // {
-           //     count++;
-           //     Ellipse(hdc, random - 10, random - 10, random + 10, random + 10);
-           // }
-           //    
-           // SelectObject(hdc, oldBrush);
-           // DeleteObject(hBrush);
-            EndPaint(hWnd, &ps);
+            str[i] = score[i];
         }
-        break;
+
+        TextOut(hdc, 150, 10, _T("Score : "), _tcslen(_T("Score : ")));
+        TextOut(hdc, 200, 10, str, _tcslen(str));
+
+        // 머리
+        headBrush = CreateSolidBrush(RGB(0, 0, 255));
+        oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
+
+        s[0].Draw(hdc);
+
+        // 몸통
+        hBrush = CreateSolidBrush(RGB(255, 255, 255));
+        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+
+        
+        if (isClicked == TRUE)
+        {
+            for (int i = 1; i <= count; i++)
+                s[i].Draw(hdc);
+            // 머리가 항상 위에 있게
+            oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
+            s[0].Draw(hdc);
+        }
+
+        // 랜덤아이템 생성
+
+        hBrush = CreateSolidBrush(RGB(255, 0, 0));  // 아이템
+        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+
+        Ellipse(hdc, items[count].x - 10, items[count].y - 10, items[count].x + 10, items[count].y + 10);
+
+        random = 50 * (rand() % 6 + 1); // 50, 100, 150, 200, 250, 300
+
+        // 아이템을 먹었다
+        if (InCircle(items[count], { s[0].GetX(), s[0].GetY() }))
+        {
+            count++;
+            items[count] = { 100 + random, 100 + random };
+            // 머리가 항상 위에 있게
+            oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
+            s[0].Draw(hdc);
+        }
+       
+
+        SelectObject(hdc, oldBrush);
+        DeleteObject(hBrush);
+        DeleteObject(headBrush);
+        EndPaint(hWnd, &ps);
+    }
+    break;
     case WM_DESTROY:
         KillTimer(hWnd, 1);
         PostQuitMessage(0);
@@ -315,4 +401,3 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     }
     return (INT_PTR)FALSE;
 }
-
