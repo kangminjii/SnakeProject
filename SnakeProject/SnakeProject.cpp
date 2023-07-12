@@ -1,7 +1,4 @@
-﻿// SnakeProject.cpp : 애플리케이션에 대한 진입점을 정의합니다.
-//
-
-#include "framework.h"
+﻿#include "framework.h"
 #include "SnakeProject.h"
 #include "Snake.h"
 #include <time.h>
@@ -11,24 +8,26 @@ using namespace std;
 #define MAX_LOADSTRING 100
 
 //WinAPI 사용하면서 콘솔창 동시에 띄우기
- 
-#ifdef UNICODE
-#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
-#else
-#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
-#endif
 
+//#ifdef UNICODE
+//#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
+//#else
+//#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
+//#endif
+
+// 두 좌표간의 거리
 double LengthPts(POINT pt1, POINT pt2)
 {
     return (sqrt((float)(pt2.x - pt1.x) * (pt2.x - pt1.x) + (pt2.y - pt1.y) * (pt2.y - pt1.y)));
 }
-
+// 충돌 판정
 BOOL InCircle(POINT pt1, POINT pt2)
 {
     if (LengthPts(pt1, pt2) <= 10)  return TRUE;
 
     return FALSE;
 }
+
 
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
@@ -79,18 +78,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int)msg.wParam;
 }
 
-//WinAPI 사용하면서 콘솔창 동시에 띄우기
-
-//#ifdef UNICODE
-//
-//#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
-//
-//#else
-//
-//#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
-//
-//#endif
-
 
 //
 //  함수: MyRegisterClass()
@@ -133,7 +120,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
     HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-        300, 100, 500, 500, nullptr, nullptr, hInstance, nullptr);
+        700, 300, 500, 500, nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd)
     {
@@ -165,12 +152,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     static RECT rectView;
 
     // snake
-    static Snake s[100];
+    static Snake s[100];               // snake의 위치 좌표
 
     // 아이템
-    static int count;
-    static int random;
-    static POINT items[100];
+    static int count = 0;                    // 몸통 수
+    static int random;                // 랜덤 좌표
+    static POINT items[100];      // 아이템 위치 좌표
+    static int tempX[100], tempY[100]; // 아이템 위치 좌표 임시 저장배열
+    static BOOL isCollided = FALSE;
 
     // 키 이벤트
     enum { Left, Right, Up, Down, None };
@@ -181,122 +170,152 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     static TCHAR str[20];
     static SIZE size;
     string score = std::to_string(count * 100);
-    
+
+    //  시작 화면
+    enum { START, GAME, NONE };
+    static int screen = START;
+
+    // 종료 이벤트
+    static int death = 0;
 
     switch (message)
     {
     case WM_CREATE:
-        GetClientRect(hWnd, &rectView); // 윈도우창 크기값을 rectView에 저장함
+        GetClientRect(hWnd, &rectView); // 윈도우창 크기값을 rectView에 저장
+        SetTimer(hWnd, 1, 200, NULL); // 타이머 설정, 속도 조절
 
-        SetTimer(hWnd, 1, 80, NULL); // 속도 조절
-
-        count = 0;
-
+        // 아이템
         srand(time(NULL));
         random = 50 * (rand() % 6 + 1); // 50, 100, 150, 200, 250, 300
         items[0] = { random, random };
 
         break;
-    case WM_TIMER: // 타이머 이벤트, 타이머는 일이 바쁘지 않을때만 잘 작동됨
+
+    case WM_TIMER:
     {
-        int tempX[100], tempY[100];
-
-        // 이전 위치 저장
-        for (int i = 0; i < count; i++)
+        ////////////  ALIVE
+        if (death == 0)
         {
-            tempX[i] = s[i].GetX();
-            tempY[i] = s[i].GetY();
-        }
-        // 머리 업데이트
-        s[0].Update(rectView);
-
-        // 새롭게 생긴 몸통의 위치와 속도를 지정
-        for (int i = 0; i < count; i++)
-        {
-            s[i + 1].SetPosition(tempX[i], tempY[i]);
-            s[i + 1].SetDirection(s[i].getDirectionX(), s[i].getDirectionY());
-        }
-
-        // 경계선에 닿았을 때, 초기화
-        if (s[0].getDirectionX() == 0 && s[0].getDirectionY() == 0)
-        {
-            // UI 초기화
+            // 이전 위치 저장
             for (int i = 0; i < count; i++)
             {
-                str[i] = 0;
+                tempX[i] = s[i].GetX();
+                tempY[i] = s[i].GetY();
             }
-            count = 0;
-            s[0].SetPosition(50, 100);
+
+            // 머리 업데이트
+            s[0].Update(rectView);
+
+            // 새롭게 생긴 몸통의 위치와 속도를 지정
+            for (int i = 0; i < count; i++)
+            {
+                s[i + 1].SetPosition(tempX[i], tempY[i]);
+                s[i + 1].SetDirection(s[i].getDirectionX(), s[i].getDirectionY());
+            }
         }
 
+        ///////////  DEATH
+        // 경계선에 닿았을 때, 초기화
+        if (screen == GAME && isClicked == TRUE)
+        {
+            if (s[0].getDirectionX() == 0 && s[0].getDirectionY() == 0)
+            {
+                // 죽음 이벤트
+                death = 1;
+                isClicked = FALSE;
+
+                // UI 초기화
+                for (int i = 0; i < count; i++)
+                    str[i] = 0;
+
+                // 뱀 길이, 위치 초기화
+                count = 0;
+                s[0].SetPosition(50, 100);
+
+                // 시작화면으로
+                screen = START;
+                break;
+            }
+        }
         // 몸통에 닿았을 때, 초기화
         for (int i = 1; i <= count; i++)
         {
             if (InCircle({ s[0].GetX(), s[0].GetY() }, { s[i].GetX(), s[i].GetY() }))
             {
+                // 죽음 이벤트
+                death = 1;
+                isClicked = FALSE;
+
                 // UI 초기화
                 for (int i = 0; i < count; i++)
-                {
                     str[i] = 0;
-                }
 
+                // 뱀 길이, 위치 초기화
                 count = 0;
                 s[0].SetPosition(50, 100);
                 s[0].SetDirection(0, 0);
+
+                // 시작화면으로
+                screen = START;
                 break;
             }
         }
-       
+
         InvalidateRect(hWnd, NULL, TRUE);
     }
     break;
+
     case WM_KEYDOWN: // 눌리면 발생
     {
-        // : wm_keydown, wm_keyup을 사용하면 반응이 즉각적이지 않음 > VK_DOWN?
-        // : GetKeyState는 "키가 눌렸는가?"와 "키의 토글상태가 무엇인가?"를 알아낼 때 사용한다. 지속적인 상태를 확인할때 사용
-        // : GetAsyncKeyState는 "키가 눌렸는가?"와 "언제부터 눌렸는가?"를 알아낼 때 사용한다. 순간적인 상태를 확인할때 사용
+        // START
+        if (wParam == VK_RETURN)
+        {
+            screen = GAME;
+        }
 
-        isClicked = TRUE;
+        // GAME
+        if (screen == GAME && wParam != VK_RETURN)
+        {
+            isClicked = TRUE;
 
-        if (GetAsyncKeyState('A') & 0x8000)
-        {
-            if (state != Right)
+            if (GetAsyncKeyState('A') & 0x8000)
             {
-                s[0].SetDirection(-20, 0); // 좌로
-                state = Left;
+                if (state != Right)
+                {
+                    s[0].SetDirection(-20, 0); // 좌로
+                    state = Left;
+                }
             }
-        }
-        if (GetAsyncKeyState('D') & 0x8000)
-        {
-            if (state != Left)
+            if (GetAsyncKeyState('D') & 0x8000)
             {
-                s[0].SetDirection(20, 0); // 우로
-                state = Right;
+                if (state != Left)
+                {
+                    s[0].SetDirection(20, 0); // 우로
+                    state = Right;
+                }
             }
-        }
-        if (GetAsyncKeyState('W') & 0x8000)
-        {
-            if (state != Down)
+            if (GetAsyncKeyState('W') & 0x8000)
             {
-                s[0].SetDirection(0, -20); // 위로
-                state = Up;
+                if (state != Down)
+                {
+                    s[0].SetDirection(0, -20); // 위로
+                    state = Up;
+                }
             }
-        }
-        if (GetAsyncKeyState('S') & 0x8000)
-        {
-            if (state != Up)
+            if (GetAsyncKeyState('S') & 0x8000)
             {
-                s[0].SetDirection(0, 20); // 아래로
-                state = Down;
+                if (state != Up)
+                {
+                    s[0].SetDirection(0, 20); // 아래로
+                    state = Down;
+                }
             }
         }
 
         InvalidateRect(hWnd, NULL, TRUE);
     }
     break;
-    case WM_KEYUP: // 눌렀다 떼면 발생
-    {
-    }
+
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
@@ -314,61 +333,90 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
     }
     break;
+
     case WM_PAINT:
     {
         hdc = BeginPaint(hWnd, &ps);
 
-        for (int i = 0; i < score.size(); i++)
+        // GAME OVER
+        if (death == 1)
         {
-            str[i] = score[i];
+            KillTimer(hWnd, 1);
+
+            int gameOver = MessageBox(hWnd, _T("Restart?"), _T("Game Over"), MB_OKCANCEL);
+            if (gameOver == IDOK) // 재시작
+            {
+                death = 0;
+                SetTimer(hWnd, 1, 200, NULL);
+            }
+            else // 종료
+                PostMessage(hWnd, WM_CLOSE, 0, 0);
+
+            break;
         }
 
-        TextOut(hdc, 150, 10, _T("Score : "), _tcslen(_T("Score : ")));
-        TextOut(hdc, 200, 10, str, _tcslen(str));
-
-        // 머리
-        headBrush = CreateSolidBrush(RGB(0, 0, 255));
-        oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
-
-        s[0].Draw(hdc);
-
-        // 몸통
-        hBrush = CreateSolidBrush(RGB(255, 255, 255));
-        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
-
-        
-        if (isClicked == TRUE)
+        // START
+        if (screen == START)
         {
+            TextOut(hdc, 200, 150, _T("SNAKE GAME"), _tcslen(_T("SNAKE GAME")));
+            TextOut(hdc, 200, 180, _T("Press Enter ..."), _tcslen(_T("Press Enter ...")));
+        }
+
+        // GAME
+        if (screen == GAME)
+        {
+            ////////////  SCORE 그리기
+            // string을 TCHAR로 변환
+            for (int i = 0; i < score.size(); i++)
+                str[i] = score[i];
+
+            TextOut(hdc, 150, 10, _T("Score : "), _tcslen(_T("Score : ")));
+            TextOut(hdc, 200, 10, str, _tcslen(str));
+
+
+            ///////////  SNAKE 그리기
+            // 머리
+            headBrush = CreateSolidBrush(RGB(0, 0, 255));
+            oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
+            s[0].Draw(hdc);
+
+            // 몸통
+            hBrush = CreateSolidBrush(RGB(255, 255, 255));
+            oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
             for (int i = 1; i <= count; i++)
                 s[i].Draw(hdc);
+
             // 머리가 항상 위에 있게
             oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
             s[0].Draw(hdc);
+
+
+            //////////  ITEM 그리기
+            // 아이템
+            hBrush = CreateSolidBrush(RGB(255, 0, 0));
+            oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+            Ellipse(hdc, items[count].x - 10, items[count].y - 10, items[count].x + 10, items[count].y + 10);
+
+            // 아이템 랜덤 좌표 생성
+            random = 50 * (rand() % 6 + 1); // 50, 100, 150, 200, 250, 300
+
+            // 아이템을 먹었다
+            if (InCircle(items[count], { s[0].GetX(), s[0].GetY() }))
+            {
+                count++;
+                items[count] = { 100 + random, 100 + random };
+
+                // 머리가 항상 위에 있게
+                oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
+                s[0].Draw(hdc);
+            }
+
+            /////////  BRUSH delete
+            SelectObject(hdc, oldBrush);
+            DeleteObject(hBrush);
+            DeleteObject(headBrush);
         }
 
-        // 랜덤아이템 생성
-
-        hBrush = CreateSolidBrush(RGB(255, 0, 0));  // 아이템
-        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
-
-        Ellipse(hdc, items[count].x - 10, items[count].y - 10, items[count].x + 10, items[count].y + 10);
-
-        random = 50 * (rand() % 6 + 1); // 50, 100, 150, 200, 250, 300
-
-        // 아이템을 먹었다
-        if (InCircle(items[count], { s[0].GetX(), s[0].GetY() }))
-        {
-            count++;
-            items[count] = { 100 + random, 100 + random };
-            // 머리가 항상 위에 있게
-            oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
-            s[0].Draw(hdc);
-        }
-       
-
-        SelectObject(hdc, oldBrush);
-        DeleteObject(hBrush);
-        DeleteObject(headBrush);
         EndPaint(hWnd, &ps);
     }
     break;
