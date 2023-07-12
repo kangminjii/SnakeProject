@@ -9,11 +9,11 @@ using namespace std;
 
 //WinAPI 사용하면서 콘솔창 동시에 띄우기
 
-#ifdef UNICODE
-#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
-#else
-#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
-#endif
+//#ifdef UNICODE
+//#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
+//#else
+//#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
+//#endif
 
 // 두 좌표간의 거리
 double LengthPts(POINT pt1, POINT pt2)
@@ -275,6 +275,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (screen == GAME)
         {
             state = None;
+
             if (GetAsyncKeyState('A') & 0x8000)
             {
                 if (state != Right)
