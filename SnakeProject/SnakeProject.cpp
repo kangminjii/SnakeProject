@@ -9,11 +9,11 @@ using namespace std;
 
 //WinAPI 사용하면서 콘솔창 동시에 띄우기
 
-//#ifdef UNICODE
-//#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
-//#else
-//#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
-//#endif
+#ifdef UNICODE
+#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
+#else
+#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
+#endif
 
 // 두 좌표간의 거리
 double LengthPts(POINT pt1, POINT pt2)
@@ -172,7 +172,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     string score = std::to_string(count * 100);
 
     //  시작 화면
-    enum { START, GAME, NONE };
+    enum { START, GAME };
     static int screen = START;
 
     // 종료 이벤트
@@ -182,7 +182,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         GetClientRect(hWnd, &rectView); // 윈도우창 크기값을 rectView에 저장
-        SetTimer(hWnd, 1, 200, NULL); // 타이머 설정, 속도 조절
+        SetTimer(hWnd, 1, 300, NULL); // 타이머 설정, 속도 조절
 
         // 아이템
         srand(time(NULL));
@@ -197,7 +197,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (death == 0)
         {
             // 이전 위치 저장
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i <= count; i++)
             {
                 tempX[i] = s[i].GetX();
                 tempY[i] = s[i].GetY();
@@ -207,7 +207,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             s[0].Update(rectView);
 
             // 새롭게 생긴 몸통의 위치와 속도를 지정
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i <= count; i++)
             {
                 s[i + 1].SetPosition(tempX[i], tempY[i]);
                 s[i + 1].SetDirection(s[i].getDirectionX(), s[i].getDirectionY());
@@ -222,8 +222,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 // 죽음 이벤트
                 death = 1;
-                isClicked = FALSE;
-
+              
                 // UI 초기화
                 for (int i = 0; i < count; i++)
                     str[i] = 0;
@@ -244,8 +243,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 // 죽음 이벤트
                 death = 1;
-                isClicked = FALSE;
-
+                
                 // UI 초기화
                 for (int i = 0; i < count; i++)
                     str[i] = 0;
@@ -274,10 +272,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
 
         // GAME
-        if (screen == GAME && wParam != VK_RETURN)
+        if (screen == GAME)
         {
-            isClicked = TRUE;
-
+            state = None;
             if (GetAsyncKeyState('A') & 0x8000)
             {
                 if (state != Right)
@@ -285,6 +282,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     s[0].SetDirection(-20, 0); // 좌로
                     state = Left;
                 }
+                isClicked = TRUE;
             }
             if (GetAsyncKeyState('D') & 0x8000)
             {
@@ -293,6 +291,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     s[0].SetDirection(20, 0); // 우로
                     state = Right;
                 }
+                isClicked = TRUE;
             }
             if (GetAsyncKeyState('W') & 0x8000)
             {
@@ -301,6 +300,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     s[0].SetDirection(0, -20); // 위로
                     state = Up;
                 }
+                isClicked = TRUE;
             }
             if (GetAsyncKeyState('S') & 0x8000)
             {
@@ -309,6 +309,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     s[0].SetDirection(0, 20); // 아래로
                     state = Down;
                 }
+                isClicked = TRUE;
             }
         }
 
@@ -342,12 +343,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (death == 1)
         {
             KillTimer(hWnd, 1);
-
             int gameOver = MessageBox(hWnd, _T("Restart?"), _T("Game Over"), MB_OKCANCEL);
             if (gameOver == IDOK) // 재시작
             {
+                SetTimer(hWnd, 1, 300, NULL);
                 death = 0;
-                SetTimer(hWnd, 1, 200, NULL);
+                isClicked = FALSE;
             }
             else // 종료
                 PostMessage(hWnd, WM_CLOSE, 0, 0);
@@ -404,7 +405,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (InCircle(items[count], { s[0].GetX(), s[0].GetY() }))
             {
                 count++;
-                items[count] = { 100 + random, 100 + random };
+                do // 같은 좌표에서 생성되지 않게끔 조정
+                {
+                    random = 50 * (rand() % 6 + 1); // 50, 100, 150, 200, 250, 300
+                    items[count] = { 100 + random, 100 + random };
+                } while (items[count - 1].x == items[count].x); 
 
                 // 머리가 항상 위에 있게
                 oldBrush = (HBRUSH)SelectObject(hdc, headBrush);
