@@ -182,7 +182,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         GetClientRect(hWnd, &rectView); // 윈도우창 크기값을 rectView에 저장
-        SetTimer(hWnd, 1, 300, NULL); // 타이머 설정, 속도 조절
+        SetTimer(hWnd, 1, 100, NULL); // 타이머 설정, 속도 조절
 
         // 아이템
         srand(time(NULL));
@@ -269,13 +269,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (wParam == VK_RETURN)
         {
             screen = GAME;
+            state = None;
         }
 
         // GAME
         if (screen == GAME)
         {
-            state = None;
-
             if (GetAsyncKeyState('A') & 0x8000)
             {
                 if (state != Right)
@@ -341,13 +340,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         hdc = BeginPaint(hWnd, &ps);
 
         // GAME OVER
-        if (death == 1)
+        if (state != None && death == 1)
         {
             KillTimer(hWnd, 1);
             int gameOver = MessageBox(hWnd, _T("Restart?"), _T("Game Over"), MB_OKCANCEL);
             if (gameOver == IDOK) // 재시작
             {
-                SetTimer(hWnd, 1, 300, NULL);
+                SetTimer(hWnd, 1, 100, NULL);
                 death = 0;
                 isClicked = FALSE;
             }
